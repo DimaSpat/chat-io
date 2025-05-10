@@ -1,10 +1,13 @@
 const express = require("express");
+const mongoose = require("mongoose");
+const dotenv = require("dotenv");
+
 const { createServer } = require("http");
 const { Server } = require("socket.io");
 const cors = require("cors");
 
+const PORT = 3001;
 const app = express();
-app.use(cors());
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
@@ -13,16 +16,58 @@ const io = new Server(httpServer, {
   },
 });
 
+const Message = require("./models/Message.ts");
+
 const messages = [];
+
+dotenv.config();
+
+async function init() {
+    try {
+        console.log("Server initialising...");
+
+        // Connect to database
+        await mongoose.connect("mongodb+srv://admin:admin@cluster.3gnwk.mongodb.net/?retryWrites=true&w=majority&appName=Cluster")
+            .then(() => console.log("Connected to MongoDB"));
+
+        // Fetch from database
+        const dbMessages = await Message.find().lean();
+
+        for (let index = 0; index < dbMessages.length; index++) {
+            messages.push(dbMessages[index].text);
+        }
+
+        console.log("Messages fetched from database:", messages);
+    } catch (err) {
+        console.error("Error initialising server:", err);
+    }
+
+    // Socket.io server
+    httpServer.listen(PORT);
+}
+
+app.use(cors());
+
+init().then(() => console.log(`Server successfully started on port ${PORT}`));
 
 io.on("connection", (socket) => {
     io.emit("existingMessages", messages);
 
     console.log(`User connected: ${socket.id}`);
 
-    socket.on("message", (message) => {
-        messages.push(message);
-        io.emit("message", message);
+    socket.on("message", async (message) => {
+        try {
+            const newDBMssage = await Message.create({ text: message });
+
+            console.log("Message saved to database:", newDBMssage);
+
+            newDBMssage.save();
+            messages.push(newDBMssage.text);
+
+            socket.broadcast.emit("message", newDBMssage.text);
+        } catch (error) {
+            console.error("Error sending message:", error);
+        }
     });
 
     socket.on("disconnect", () => {
@@ -30,7 +75,3 @@ io.on("connection", (socket) => {
     })
 });
 
-const PORT = 3001;
-httpServer.listen(PORT, () => {
-    console.log(`Server started on port ${PORT}`);
-});
