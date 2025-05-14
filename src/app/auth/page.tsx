@@ -11,7 +11,7 @@ const metadata: Metadata = {
 export default function Home(): JSX.Element {
   const [user, setUser] = useState<string | null>(null);
   const [password, setPassword] = useState<string | null>(null);
-  const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
+  const [isLoggingIn, setIsLoggingIn] = useState<boolean>(true);
 
   const router = useRouter();
 

@@ -1,27 +1,146 @@
 "use client";
 
-import { type JSX, useEffect, useState } from "react";
+import { type JSX, useEffect, useState, useRef } from "react";
 import socket from "@/lib/socket";
 import { useRouter } from "next/navigation";
 
 export default function ChatOutput() {
   const [messages, setMessages] = useState<string[]>([]);
   const [isConnected, setIsConnected] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  useEffect((): void => {
-    socket.on("existingMessages", (messages: string[]): void => {
+  const router = useRouter();
+
+  // Function to scroll to bottom of messages
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    // Check if logged into an account
+    if (localStorage.length === 0) {
+      router.push("/auth");
+    }
+
+    // Check if socket is connected
+    if (socket.connected) {
+      console.log("Socket already connected on mount");
+    } else {
+      console.log("Socket not connected on mount, connecting...");
+      socket.connect();
+    }
+
+    // Function to handle existing messages
+    const handleExistingMessages = (messages: string[]): void => {
+      console.log("Received existing messages:", messages);
       setMessages(messages);
       setIsConnected(true);
-    });
+      // Scroll to bottom after messages load
+      setTimeout(scrollToBottom, 100);
+    };
 
-    socket.on("message", (message: string): void => {
-      setMessages((prevMessages: string[]): string[] => [
-        ...prevMessages,
-        message,
-      ]);
-    });
-  });
+    // Function to handle new messages
+    const handleNewMessage = (message: string): void => {
+      console.log("Received new message:", message);
+      setMessages((prevMessages: string[]): string[] => {
+        const updatedMessages = [...prevMessages, message];
+        // Scroll to bottom after state update
+        setTimeout(scrollToBottom, 100);
+        return updatedMessages;
+      });
+    };
 
+    // Register event handlers
+    socket.on("existingMessages", handleExistingMessages);
+    socket.on("message", handleNewMessage);
+
+    // Request messages from server if connected
+    if (socket.connected) {
+      console.log("Requesting messages from server");
+      socket.emit("getMessages");
+    }
+
+    // Cleanup function
+    return () => {
+      console.log("Cleaning up socket event listeners");
+      socket.off("existingMessages", handleExistingMessages);
+      socket.off("message", handleNewMessage);
+    };
+  }, []); // Empty dependency array to run only once on mount
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  // Handle errors
+  if (error) {
+    return (
+      <div
+        style={{
+          height: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexDirection: "column",
+          color: "#ef4444",
+          textAlign: "center",
+          padding: "2rem",
+        }}
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="64"
+          height="64"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          style={{ marginBottom: "1rem", color: "#ef4444" }}
+        >
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        <h1
+          style={{
+            fontSize: "1.25rem",
+            fontWeight: "500",
+            margin: "0 0 0.5rem 0",
+          }}
+        >
+          Connection Error
+        </h1>
+        <p
+          style={{
+            fontSize: "0.875rem",
+            margin: 0,
+          }}
+        >
+          {error}
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          style={{
+            marginTop: "1rem",
+            padding: "0.5rem 1rem",
+            backgroundColor: "#ef4444",
+            color: "white",
+            border: "none",
+            borderRadius: "0.375rem",
+            cursor: "pointer",
+          }}
+        >
+          Retry Connection
+        </button>
+      </div>
+    );
+  }
+
+  // Loading state
   if (!isConnected) {
     return (
       <div
@@ -54,6 +173,15 @@ export default function ChatOutput() {
         >
           Connecting to chat...
         </h1>
+        <p
+          style={{
+            fontSize: "0.875rem",
+            color: "#6c757d",
+            margin: "0.5rem 0 0 0",
+          }}
+        >
+          This may take a moment
+        </p>
 
         <style jsx>{`
           @keyframes spin {
@@ -66,6 +194,7 @@ export default function ChatOutput() {
     );
   }
 
+  // Empty state
   if (messages.length === 0) {
     return (
       <div
@@ -115,6 +244,7 @@ export default function ChatOutput() {
     );
   }
 
+  // Messages display
   return (
     <div
       style={{
@@ -127,8 +257,7 @@ export default function ChatOutput() {
       }}
     >
       {messages.map((message: string, index: number): JSX.Element => {
-        // Simple logic to determine if message is from current user (for demo purposes)
-        // In a real app, you'd have proper user IDs
+        // Simple logic to determine if message is from current user
         const isCurrentUser = message.startsWith(
           localStorage.getItem("user") || "",
         );
@@ -154,6 +283,8 @@ export default function ChatOutput() {
           </div>
         );
       })}
+      {/* Invisible div for scrolling to bottom */}
+      <div ref={messagesEndRef} />
     </div>
   );
 }
