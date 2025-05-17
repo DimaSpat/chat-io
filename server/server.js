@@ -17,6 +17,7 @@ const io = new Server(httpServer, {
 });
 
 const Message = require("./models/Message.ts");
+const authRoutes = require("./routes/auth.js");
 
 const messages = [];
 
@@ -37,7 +38,7 @@ async function init() {
             messages.push(dbMessages[index].text);
         }
 
-        console.log("Messages fetched from database:", messages);
+        console.log("Messages fetched from database");
     } catch (err) {
         console.error("Error initialising server:", err);
     }
@@ -47,6 +48,9 @@ async function init() {
 }
 
 app.use(cors());
+app.use(express.json());
+
+app.use("/api/auth", authRoutes);
 
 init().then(() => console.log(`Server successfully started on port ${PORT}`));
 
