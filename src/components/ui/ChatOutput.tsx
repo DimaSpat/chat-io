@@ -11,15 +11,18 @@ export default function ChatOutput() {
   const router = useRouter();
 
   useEffect((): void => {
+    console.log(1);
+
     socket.on("existingMessages", (messages: string[]): void => {
       setMessages(messages);
       setIsConnected(true);
+      console.log(2);
     });
 
     socket.on("message", (message: string): void => {
       setMessages((prevMessages: string[]): string[] => [...prevMessages, message]);
     });
-  }, [router]);
+  }, []);
 
 
 

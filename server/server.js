@@ -38,7 +38,7 @@ async function init() {
             messages.push(dbMessages[index].text);
         }
 
-        console.log("Messages fetched from database:", messages);
+        console.log("Messages fetched from database");
     } catch (err) {
         console.error("Error initialising server:", err);
     }
